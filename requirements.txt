@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+pydantic
+sqlalchemy
+psycopg[binary]
+python-jose[cryptography]
+# 避免 passlib 与 bcrypt 新版本不兼容导致的 "module 'bcrypt' has no attribute '__about__'" 错误
+passlib[bcrypt]==1.7.4
+bcrypt==4.0.1
