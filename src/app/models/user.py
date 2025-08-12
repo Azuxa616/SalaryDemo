@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Optional
 
 from sqlalchemy import Boolean, Column, DateTime, Integer, String, SmallInteger, func
-from sqlalchemy.orm import validates
+from sqlalchemy.orm import validates, relationship
 from pydantic import BaseModel, Field
 
 from app.db.base import Base
@@ -21,7 +21,10 @@ class User(Base):
     is_active = Column(Boolean, nullable=False, default=True)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
-
+    
+    # 关系定义
+    worklogs = relationship("WorkLog", back_populates="employee")
+    
     @validates("role")
     def validate_role(self, key, value):  # type: ignore[no-untyped-def]
         if value is None or not (1 <= int(value) <= 4):

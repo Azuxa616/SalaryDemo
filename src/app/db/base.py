@@ -10,10 +10,9 @@ Base = declarative_base()
 # 引入模型，确保 Base.metadata 能收集到表
 # 如果新增模型，请在此处导入
 try:
-    from app.models.worklog import WorkLog  # noqa: F401
-except Exception:
-    pass
-try:
     from app.models.user import User  # noqa: F401
-except Exception:
+    from app.models.project import Project  # noqa: F401
+    from app.models.worklog import WorkLog  # noqa: F401
+except Exception as e:
+    print(f"Warning: Failed to import models: {e}")
     pass

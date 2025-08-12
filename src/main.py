@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from app.db.base import Base, engine
 from app.api.routes.auth import router as auth_router
+from app.api.routes.projects import router as projects_router
 from app.core.config import BASE_URL
 from fastapi import FastAPI
 from fastapi import FastAPI
@@ -14,6 +15,7 @@ def read_root():
 
 
 app.include_router(auth_router)
+app.include_router(projects_router)
 
 
 @app.on_event("startup")
