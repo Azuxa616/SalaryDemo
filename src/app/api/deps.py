@@ -35,12 +35,18 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
     if not user_id:
         raise credentials_exception
     user = db.query(User).filter(User.id == int(user_id)).first()
+   
+    if user:
+        # 确保属性已加载
+        _ = user.role  # 触发加载
+        
     if user is None:
         raise credentials_exception
     # SQLAlchemy 的 InstrumentedAttribute 在类型检查中不可用作布尔值，显式转换
     is_active: bool = cast(bool, user.is_active)
     if not is_active:
         raise credentials_exception
+    
     return user
 
 

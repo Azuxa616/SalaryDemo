@@ -20,6 +20,8 @@ class WorkLog(Base):
     task_type = Column(String(50), nullable=False, index=True)
     hours = Column(DECIMAL(4,2), nullable=False)
     remarks = Column(Text, nullable=True)
+    status = Column(Integer, nullable=False, default=0, index=True)  # 0=待核算，1=已核算，2=保留
+    ext_field = Column(String(50), nullable=True, index=True)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
     
@@ -36,6 +38,7 @@ class WorkLogBase(BaseModel):
     task_type: str = Field(min_length=1, max_length=50, description="任务类型")
     hours: float = Field(gt=0, le=24, description="工时")
     remarks: Optional[str] = Field(None, description="备注")
+    ext_field: Optional[str] = Field(None, max_length=50, description="扩展字段")
 
 
 class WorkLogCreate(WorkLogBase):
@@ -49,10 +52,12 @@ class WorkLogUpdate(BaseModel):
     task_type: Optional[str] = Field(None, min_length=1, max_length=50, description="任务类型")
     hours: Optional[float] = Field(None, gt=0, le=24, description="工时")
     remarks: Optional[str] = Field(None, description="备注")
+    ext_field: Optional[str] = Field(None, max_length=50, description="扩展字段")
 
 
 class WorkLogOut(WorkLogBase):
     entry_id: UUID
+    status: int = Field(description="核算状态：0=待核算，1=已核算，2=保留状态")
     created_at: datetime
     updated_at: datetime
 

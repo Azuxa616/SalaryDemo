@@ -12,12 +12,15 @@ CREATE TABLE IF NOT EXISTS public.worklogs (
     task_type     VARCHAR(50) NOT NULL,
     hours         DECIMAL(4,2) NOT NULL,
     remarks       TEXT,
+    status        SMALLINT NOT NULL DEFAULT 0,
+    ext_field     VARCHAR(50),
     created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
     
     -- 约束条件
     CONSTRAINT worklogs_hours_check CHECK (hours > 0 AND hours <= 24),
-    CONSTRAINT worklogs_date_check CHECK (date <= CURRENT_DATE)
+    CONSTRAINT worklogs_date_check CHECK (date <= CURRENT_DATE),
+    CONSTRAINT worklogs_status_check CHECK (status IN (0, 1, 2))
 );
 
 -- 创建索引以提高查询性能
@@ -25,6 +28,8 @@ CREATE INDEX IF NOT EXISTS idx_worklogs_employee_id ON public.worklogs (employee
 CREATE INDEX IF NOT EXISTS idx_worklogs_date ON public.worklogs (date);
 CREATE INDEX IF NOT EXISTS idx_worklogs_project_id ON public.worklogs (project_id);
 CREATE INDEX IF NOT EXISTS idx_worklogs_task_type ON public.worklogs (task_type);
+CREATE INDEX IF NOT EXISTS idx_worklogs_status ON public.worklogs (status);
+CREATE INDEX IF NOT EXISTS idx_worklogs_ext_field ON public.worklogs (ext_field);
 
 -- 创建复合索引用于常见查询场景
 CREATE INDEX IF NOT EXISTS idx_worklogs_employee_date ON public.worklogs (employee_id, date);
@@ -65,5 +70,7 @@ COMMENT ON COLUMN public.worklogs.project_id IS '项目ID，关联项目表(proj
 COMMENT ON COLUMN public.worklogs.task_type IS '任务类型，如开发、测试、文档等';
 COMMENT ON COLUMN public.worklogs.hours IS '工时，范围0.01-24小时';
 COMMENT ON COLUMN public.worklogs.remarks IS '备注信息，可选字段';
+COMMENT ON COLUMN public.worklogs.status IS '核算状态：0=待核算，1=已核算，2=保留状态';
+COMMENT ON COLUMN public.worklogs.ext_field IS '扩展字段，用于日后迭代开发，可选';
 COMMENT ON COLUMN public.worklogs.created_at IS '记录创建时间';
 COMMENT ON COLUMN public.worklogs.updated_at IS '记录最后更新时间';
