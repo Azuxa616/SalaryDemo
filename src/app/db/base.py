@@ -13,6 +13,13 @@ try:
     from app.models.user import User  # noqa: F401
     from app.models.project import Project  # noqa: F401
     from app.models.worklog import WorkLog  # noqa: F401
+    from app.models.salary_engine import (  # noqa: F401
+        SalaryRule,
+        SalaryCalculationBatch,
+        SalaryCalculationResult,
+        EmployeeSalaryConfig,
+        DeductionConfig
+    )
 except Exception as e:
     print(f"Warning: Failed to import models: {e}")
     pass

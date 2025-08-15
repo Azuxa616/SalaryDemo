@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_db, require_role
 from app.core.security import create_access_token, get_password_hash, verify_password
 from app.models.user import TokenOut, User, UserCreate, UserLogin, UserOut
+from app.models.salary_engine import EmployeeSalaryConfig
 
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -43,18 +44,38 @@ def register(user_in: UserCreate, db: Session = Depends(get_db)):
     exists = db.query(User).filter(User.username == user_in.username).first()
     if exists:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Username already exists")
-    user = User(
-        username=user_in.username,
-        email=user_in.email,
-        full_name=user_in.full_name,
-        password_hash=get_password_hash(user_in.password),
-        role=user_in.role,
-        is_active=True,
-    )
-    db.add(user)
-    db.commit()
-    db.refresh(user)
-    return user
+    
+    try:
+        user = User(
+            username=user_in.username,
+            email=user_in.email,
+            full_name=user_in.full_name,
+            password_hash=get_password_hash(user_in.password),
+            role=user_in.role,
+            is_active=True,
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+        
+        # 为新注册用户添加默认薪资配置
+        salary_config = EmployeeSalaryConfig(
+            employee_id=user.id,
+            base_salary=0,  # 默认基本工资为0
+            hourly_rate=20,  # 默认时薪为0
+            overtime_rate=1.5,  # 默认加班倍率为1.5
+            is_active=True
+        )
+        db.add(salary_config)
+        db.commit()
+        
+        return user
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
+            detail=f"Registration failed: {str(e)}"
+        )
 
 
 @router.get("/me", response_model=UserOut)
