@@ -5,6 +5,7 @@ from app.api.routes.auth import router as auth_router
 from app.api.routes.projects import router as projects_router
 from app.api.routes.worklogs import router as worklogs_router
 from app.api.routes.salary_config import router as salary_config_router
+from app.api.routes.salary_calculation import router as salary_calculation_router
 from app.core.config import BASE_URL
 
 
@@ -50,6 +51,7 @@ app.include_router(auth_router)
 app.include_router(projects_router)
 app.include_router(worklogs_router)
 app.include_router(salary_config_router)
+app.include_router(salary_calculation_router)
 
 
 # 如果直接运行此文件，则启动服务器
@@ -60,5 +62,5 @@ if __name__ == "__main__":
         host="127.0.0.1",
         port=8000,
         reload=True,
-        log_level="info"
+        log_level="debug"
     )

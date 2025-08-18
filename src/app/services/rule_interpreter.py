@@ -5,7 +5,7 @@
 import re
 import logging
 from typing import Dict, Any, List, Optional
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +26,7 @@ class RuleInterpreter:
         try:
             rule_type = rule.get('rule_type')
             formula = rule.get('formula')
+            logger.debug("执行规则: name=%s, type=%s, formula=%s, variables=%s", rule.get('name'), rule_type, formula, rule.get('variables'))
             
             if rule_type == 'FIXED':
                 return self._evaluate_fixed_rule(rule, context)
@@ -43,11 +44,29 @@ class RuleInterpreter:
     def _evaluate_fixed_rule(self, rule: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         """执行固定金额规则"""
         try:
-            amount = rule.get('fixed_amount', 0)
-            if amount is None:
-                # 尝试从公式中提取数字
-                numbers = re.findall(r'\b\d+\.?\d*\b', rule['formula'])
-                amount = Decimal(numbers[0]) if numbers else 0
+            fixed_amount = rule.get('fixed_amount')
+            amount: Decimal
+            if fixed_amount is not None:
+                # 写死的固定金额
+                try:
+                    amount = Decimal(str(fixed_amount))
+                except InvalidOperation:
+                    amount = Decimal('0')
+            else:
+                # 无固定金额：优先把 formula 当作变量路径解析（示例：base_salary）
+                formula = rule.get('formula', '') or ''
+                var_value = self._get_variable_value(formula, context)
+                if var_value is not None:
+                    try:
+                        amount = Decimal(str(var_value))
+                    except InvalidOperation:
+                        amount = Decimal('0')
+                else:
+                    # 回退：尝试从公式中提取数字
+                    numbers = re.findall(r'\b\d+\.?\d*\b', formula)
+                    amount = Decimal(numbers[0]) if numbers else Decimal('0')
+            amount = self._round2(amount)
+            logger.debug("固定规则结果: name=%s, amount=%s", rule.get('name'), amount)
             
             return {
                 'amount': Decimal(str(amount)),
@@ -66,13 +85,19 @@ class RuleInterpreter:
             
             # 获取变量值
             var_values = {}
+            # 若 rule.variables 映射存在，则先将显示的变量名映射为上下文路径
+            mapping = rule.get('variables') or {}
             for var in variables:
-                value = self._get_variable_value(var, context)
+                ctx_path = mapping.get(var, var)
+                value = self._get_variable_value(ctx_path, context)
                 if value is not None:
                     var_values[var] = value
+            logger.debug("比率规则变量: name=%s, vars=%s", rule.get('name'), var_values)
             
             # 执行计算
             result = self._execute_formula(rule['formula'], var_values)
+            result = self._round2(result)
+            logger.debug("比率规则结果: name=%s, result=%s", rule.get('name'), result)
             
             return {
                 'amount': result,
@@ -101,12 +126,15 @@ class RuleInterpreter:
             # 执行条件满足后的计算
             variables = self._extract_variables(rule['formula'])
             var_values = {}
+            mapping = rule.get('variables') or {}
             for var in variables:
-                value = self._get_variable_value(var, context)
+                ctx_path = mapping.get(var, var)
+                value = self._get_variable_value(ctx_path, context)
                 if value is not None:
                     var_values[var] = value
             
             result = self._execute_formula(rule['formula'], var_values)
+            result = self._round2(result)
             
             return {
                 'amount': result,
@@ -197,9 +225,17 @@ class RuleInterpreter:
             for var_name, var_value in variables.items():
                 if isinstance(var_value, (int, float, Decimal)):
                     expression = expression.replace(var_name, str(var_value))
+            logger.debug("公式执行: formula=%s -> expression=%s", formula, expression)
             
             result = eval(expression, {"__builtins__": {}}, {})
             return Decimal(str(result))
         except Exception as e:
             logger.error(f"公式执行失败: {formula}, 错误: {str(e)}")
             return Decimal('0')
+
+    def _round2(self, value: Any) -> Decimal:
+        """四舍五入到2位小数，返回Decimal"""
+        try:
+            return Decimal(str(value)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+        except Exception:
+            return Decimal('0.00')

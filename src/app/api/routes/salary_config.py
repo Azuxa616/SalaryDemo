@@ -7,6 +7,10 @@ from typing import List, Optional, cast
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_
+from datetime import date, datetime
+from pydantic import BaseModel, Field
+import logging
+from uuid import UUID
 
 from app.api.deps import get_db, get_current_user, require_role
 from app.core.roles import ROLE_ADMIN, ROLE_SUPERADMIN
@@ -16,10 +20,17 @@ from app.models.salary_engine import (
     EmployeeSalaryConfigCreate, 
     EmployeeSalaryConfigUpdate, 
     EmployeeSalaryConfigOut,
-    EmployeeSalaryConfigList
+    EmployeeSalaryConfigList,
+    SalaryCalculationBatch
 )
+from app.services.salary_calculation_service import SalaryCalculationService
 
 router = APIRouter(prefix="/salary-config", tags=["salary-config"])
+
+"""
+注意：计算相关接口已迁移至 `salary_calculation.py`。
+此文件仅保留薪资配置CRUD相关接口。
+"""
 
 
 def can_access_employee(current_user: User, target_employee_id: int, db: Session) -> bool:
@@ -290,3 +301,6 @@ def get_employee_salary_configs(
     ).order_by(EmployeeSalaryConfig.effective_from.desc()).all()
     
     return [EmployeeSalaryConfigOut.from_orm(config) for config in configs]
+
+
+

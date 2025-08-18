@@ -45,12 +45,14 @@ class SalaryCalculationBatch(Base):
     period_start: Mapped[date] = mapped_column(Date, nullable=False, index=True)
     period_end: Mapped[date] = mapped_column(Date, nullable=False, index=True)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="PENDING", index=True)
+    scheduled_time: Mapped[Optional[datetime]] = mapped_column(TIMESTAMP(timezone=True), index=True)  # 定时执行时间
     total_employees: Mapped[int] = mapped_column(Integer, default=0)
     processed_count: Mapped[int] = mapped_column(Integer, default=0)
     success_count: Mapped[int] = mapped_column(Integer, default=0)
     error_count: Mapped[int] = mapped_column(Integer, default=0)
     total_amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=Decimal('0'))
     error_log: Mapped[Optional[str]] = mapped_column(Text)
+    description: Mapped[Optional[str]] = mapped_column(Text)  # 批次描述
     started_at: Mapped[Optional[datetime]] = mapped_column(TIMESTAMP(timezone=True))
     completed_at: Mapped[Optional[datetime]] = mapped_column(TIMESTAMP(timezone=True))
     created_by: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False, index=True)
