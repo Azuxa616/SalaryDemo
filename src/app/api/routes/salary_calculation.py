@@ -15,7 +15,9 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_db, require_role, get_current_user
 from app.core.roles import ROLE_ADMIN, ROLE_SUPERADMIN
 from app.models.user import User
-from app.models.salary_engine import SalaryCalculationBatch
+from app.models.salary_engine import SalaryCalculationBatch, SalaryCalculationResult
+from app.core.roles import ROLE_ADMIN
+from app.api.deps import get_current_user
 from app.services.salary_calculation_service import SalaryCalculationService
 
 router = APIRouter(prefix="/salary-calculation", tags=["salary-calculation"])
@@ -238,3 +240,139 @@ async def delete_calculation_batch(
 	db.delete(batch)
 	db.commit()
 	return {"success": True, "message": f"批次 {batch_id} 删除成功"}
+
+
+# ========== 新增接口 ==========
+
+@router.get("/results", response_model=List[dict])
+async def list_calculation_results(
+	batch_id: Optional[str] = Query(None, description="批次ID（可选）"),
+	employee_id: Optional[str] = Query(None, description="员工ID（可选）"),
+	period_start: Optional[str] = Query(None, description="开始日期（YYYY-MM-DD，可选）"),
+	period_end: Optional[str] = Query(None, description="结束日期（YYYY-MM-DD，可选）"),
+	skip: int = Query(0, ge=0, description="跳过记录数"),
+	limit: int = Query(100, ge=1, le=1000, description="返回记录数"),
+	db: Session = Depends(get_db),
+	current_user: User = Depends(require_role(ROLE_ADMIN))
+):
+	"""查询计算结果（仅管理员）"""
+	query = db.query(SalaryCalculationResult)
+	# 容错解析
+	emp_id_int = _parse_optional_int(employee_id)
+	ps_date = _parse_optional_date(period_start)
+	pe_date = _parse_optional_date(period_end)
+
+	if batch_id and batch_id.strip():
+		query = query.filter(SalaryCalculationResult.batch_id == batch_id)
+	if emp_id_int is not None:
+		query = query.filter(SalaryCalculationResult.employee_id == emp_id_int)
+	if ps_date is not None:
+		query = query.filter(SalaryCalculationResult.period_start >= ps_date)
+	if pe_date is not None:
+		query = query.filter(SalaryCalculationResult.period_end <= pe_date)
+
+	items = query.order_by(SalaryCalculationResult.period_start.desc()).offset(skip).limit(limit).all()
+	result: List[dict] = []
+	for it in items:
+		result.append({
+			"id": str(it.id),
+			"batch_id": str(it.batch_id),
+			"employee_id": it.employee_id,
+			"period_start": it.period_start,
+			"period_end": it.period_end,
+			"base_salary": float(it.base_salary) if it.base_salary is not None else 0,
+			"total_hours": float(it.total_hours) if it.total_hours is not None else 0,
+			"overtime_hours": float(it.overtime_hours) if it.overtime_hours is not None else 0,
+			"rule_results": it.rule_results,
+			"total_amount": float(it.total_amount) if it.total_amount is not None else 0,
+			"deductions": it.deductions,
+			"net_amount": float(it.net_amount) if it.net_amount is not None else 0,
+			"status": it.status,
+			"created_at": it.created_at,
+			"updated_at": it.updated_at,
+		})
+	return result
+
+
+def _can_access_employee(current_user: User, target_employee_id: int, db: Session) -> bool:
+	"""管理员可访问权限小于自身的用户；非管理员只能访问自己。"""
+	if int(current_user.role) >= ROLE_ADMIN:
+		# 管理员：仅允许访问权限低于自己的用户
+		target = db.query(User).filter(User.id == target_employee_id).first()
+		if not target:
+			return False
+		return int(current_user.role) > int(target.role)
+	# 非管理员：只能访问自己
+	return int(current_user.id) == int(target_employee_id)
+
+
+@router.get("/employee-sum", response_model=dict)
+async def get_employee_salary_sum(
+	employee_id: Optional[str] = Query(None, description="员工ID（可选，不填则查询当前用户）"),
+	period_start: Optional[str] = Query(None, description="开始日期（YYYY-MM-DD，可选）"),
+	period_end: Optional[str] = Query(None, description="结束日期（YYYY-MM-DD，可选）"),
+	db: Session = Depends(get_db),
+	current_user: User = Depends(get_current_user)
+):
+	"""
+	查询员工已结算薪资之和：
+	- 管理员可查询权限小于自己的用户
+	- 其他用户只能查询自己的薪资
+	- 时间范围可选；为空则查询所有
+	"""
+	# 解析目标员工
+	if employee_id is None or employee_id.strip() == "":
+		emp_id_int = int(current_user.id)
+	else:
+		emp_id_int = _parse_optional_int(employee_id) or int(current_user.id)
+	# 权限检查
+	if not _can_access_employee(current_user, int(emp_id_int), db):
+		raise HTTPException(status_code=403, detail="Insufficient permissions")
+
+	ps_date = _parse_optional_date(period_start)
+	pe_date = _parse_optional_date(period_end)
+
+	query = db.query(SalaryCalculationResult).filter(SalaryCalculationResult.employee_id == int(emp_id_int))
+	if ps_date is not None:
+		query = query.filter(SalaryCalculationResult.period_start >= ps_date)
+	if pe_date is not None:
+		query = query.filter(SalaryCalculationResult.period_end <= pe_date)
+
+	records = query.all()
+	count = len(records)
+	total_net = sum((rec.net_amount or 0) for rec in records)
+	return {
+		"employee_id": int(emp_id_int),
+		"period_start": ps_date,
+		"period_end": pe_date,
+		"count": count,
+		"total_net_amount": float(total_net)
+	}
+
+
+def _parse_optional_int(value: Optional[str]) -> Optional[int]:
+	try:
+		if value is None:
+			return None
+		s = str(value).strip()
+		if s == "":
+			return None
+		return int(s)
+	except Exception:
+		return None
+
+
+def _parse_optional_date(value: Optional[str]) -> Optional[date]:
+	try:
+		if value is None:
+			return None
+		s = str(value).strip()
+		if s == "":
+			return None
+		# 支持 YYYY-MM-DD 或 ISO datetime
+		try:
+			return date.fromisoformat(s)
+		except Exception:
+			return datetime.fromisoformat(s).date()
+	except Exception:
+		return None
