@@ -10,7 +10,7 @@
 
 ### 1. 计算薪资接口
 
-**接口地址：** `POST /api/salary-config/calculate-salary`
+**接口地址：** `POST /salary-calculation/calculate-salary`
 
 **权限要求：** 管理员及以上权限（role >= 3）
 
@@ -32,7 +32,7 @@
 
 **立即计算：**
 ```bash
-curl -X POST "http://localhost:8000/api/salary-config/calculate-salary" \
+curl -X POST "http://localhost:8000/salary-calculation/calculate-salary" \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -45,12 +45,35 @@ curl -X POST "http://localhost:8000/api/salary-config/calculate-salary" \
 
 **定时计算：**
 ```bash
-curl -X POST "http://localhost:8000/api/salary-config/calculate-salary" \
+curl -X POST "http://localhost:8000/salary-calculation/calculate-salary" \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "calculation_type": "SCHEDULED",
-    "scheduled_time": "2024-02-01T09:00:00Z",
+    "scheduled_time": "2024-02-01T09:00:00Z",  
+    "batch_name": "2月份薪资计算",
+    "period_start": "2024-02-01",
+    "period_end": "2024-02-29",
+    "calculation_period": "MONTHLY",
+    "description": "2月份月度薪资计算"
+  }'
+```
+
+### 时间格式与时区（重要）
+
+- 服务器与数据库统一使用 UTC，后端会将前端传入的 `scheduled_time` 标准化为 UTC 入库。
+- 推荐总是传“带时区”的 ISO8601 时间：
+  - 北京时间 2025-08-21 16:10 触发：`"2025-08-21T16:10:00+08:00"`
+  - 等价的 UTC：`"2025-08-21T08:10:00Z"`
+- 如果只能传“无时区”的时间（不推荐），后端按 `Asia/Shanghai` 解释并转换为 UTC。
+- 提交样例（本地 +08:00）：
+```bash
+curl -X POST "http://localhost:8000/salary-calculation/calculate-salary" \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "calculation_type": "SCHEDULED",
+    "scheduled_time": "2025-08-21T16:10:00+08:00",
     "batch_name": "2月份薪资计算",
     "period_start": "2024-02-01",
     "period_end": "2024-02-29",
@@ -92,7 +115,7 @@ curl -X POST "http://localhost:8000/api/salary-config/calculate-salary" \
 
 ### 2. 获取计算批次列表
 
-**接口地址：** `GET /api/salary-config/calculation-batches`
+**接口地址：** `GET /salary-calculation/calculation-batches`
 
 **权限要求：** 管理员及以上权限（role >= 3）
 
@@ -106,15 +129,15 @@ curl -X POST "http://localhost:8000/api/salary-config/calculate-salary" \
 
 ```bash
 # 获取所有批次
-curl "http://localhost:8000/api/salary-config/calculation-batches" \
+curl "http://localhost:8000/salary-calculation/calculation-batches" \
   -H "Authorization: Bearer YOUR_TOKEN"
 
 # 获取待执行的批次
-curl "http://localhost:8000/api/salary-config/calculation-batches?status=SCHEDULED" \
+curl "http://localhost:8000/salary-calculation/calculation-batches?status=SCHEDULED" \
   -H "Authorization: Bearer YOUR_TOKEN"
 
 # 分页查询
-curl "http://localhost:8000/api/salary-config/calculation-batches?skip=0&limit=20" \
+curl "http://localhost:8000/salary-calculation/calculation-batches?skip=0&limit=20" \
   -H "Authorization: Bearer YOUR_TOKEN"
 ```
 
@@ -145,14 +168,14 @@ curl "http://localhost:8000/api/salary-config/calculation-batches?skip=0&limit=2
 
 ### 3. 执行定时计算批次
 
-**接口地址：** `POST /api/salary-config/execute-scheduled-batch/{batch_id}`
+**接口地址：** `POST /salary-calculation/execute-scheduled-batch/{batch_id}`
 
 **权限要求：** 管理员及以上权限（role >= 3）
 
 #### 使用示例
 
 ```bash
-curl -X POST "http://localhost:8000/api/salary-config/execute-scheduled-batch/uuid-123" \
+curl -X POST "http://localhost:8000/salary-calculation/execute-scheduled-batch/uuid-123" \
   -H "Authorization: Bearer YOUR_TOKEN"
 ```
 
@@ -168,14 +191,14 @@ curl -X POST "http://localhost:8000/api/salary-config/execute-scheduled-batch/uu
 
 ### 4. 删除计算批次
 
-**接口地址：** `DELETE /api/salary-config/calculation-batch/{batch_id}`
+**接口地址：** `DELETE /salary-calculation/calculation-batch/{batch_id}`
 
 **权限要求：** 超级管理员权限（role >= 4）
 
 #### 使用示例
 
 ```bash
-curl -X DELETE "http://localhost:8000/api/salary-config/calculation-batch/uuid-123" \
+curl -X DELETE "http://localhost:8000/salary-calculation/calculation-batch/uuid-123" \
   -H "Authorization: Bearer YOUR_TOKEN"
 ```
 
