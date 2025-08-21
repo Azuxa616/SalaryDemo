@@ -7,7 +7,7 @@ from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import relationship
 from pydantic import BaseModel, Field
 
-from app.db.base import Base
+from src.app.db.base import Base
 
 
 class Project(Base):

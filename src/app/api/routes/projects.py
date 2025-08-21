@@ -3,10 +3,10 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db, get_current_user, require_role
-from app.models.user import User
-from app.models.project import ProjectCreate, ProjectUpdate, ProjectOut, ProjectList
-from app.services.project_service import ProjectService
+from src.app.api.deps import get_db, get_current_user, require_role
+from src.app.models.user import User
+from src.app.models.project import ProjectCreate, ProjectUpdate, ProjectOut, ProjectList
+from src.app.services.project_service import ProjectService
 
 router = APIRouter(prefix="/projects", tags=["projects"])
 

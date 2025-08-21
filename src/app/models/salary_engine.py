@@ -10,7 +10,7 @@ from sqlalchemy import Column, String, Text, Boolean, Date, Integer, Numeric, Fo
 from sqlalchemy.dialects.postgresql import UUID as PostgresUUID, TIMESTAMP
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 
-from app.db.base import Base
+from src.app.db.base import Base
 
 
 class SalaryRule(Base):

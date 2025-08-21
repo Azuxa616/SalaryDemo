@@ -1,4 +1,4 @@
-from app.models.salary import SalaryResult
+from src.app.models.salary import SalaryResult
 
 def calculate_salary(worklog):
     # TODO: 实现薪资计算逻辑

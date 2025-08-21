@@ -5,10 +5,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi import status
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db, get_current_user, require_role
-from app.models.user import User
-from app.models.worklog import WorkLogCreate, WorkLogUpdate, WorkLogOut, WorkLogList
-from app.services.worklog_service import WorkLogService
+from src.app.api.deps import get_db, get_current_user, require_role
+from src.app.models.user import User
+from src.app.models.worklog import WorkLogCreate, WorkLogUpdate, WorkLogOut, WorkLogList
+from src.app.services.worklog_service import WorkLogService
 
 router = APIRouter(prefix="/worklogs", tags=["worklogs"])
 

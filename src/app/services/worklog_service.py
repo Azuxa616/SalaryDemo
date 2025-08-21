@@ -4,8 +4,8 @@ from datetime import datetime, date
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
-from app.models.worklog import WorkLog, WorkLogCreate, WorkLogUpdate
-from app.models.user import User
+from src.app.models.worklog import WorkLog, WorkLogCreate, WorkLogUpdate
+from src.app.models.user import User
 
 
 class WorkLogService:
@@ -28,13 +28,13 @@ class WorkLogService:
     def create_worklog(self, worklog_data: WorkLogCreate, current_user: User) -> WorkLog:
         """创建工作记录"""
         # 检查员工ID是否存在
-        from app.models.user import User
+        from src.app.models.user import User
         employee = self.db.query(User).filter(User.id == worklog_data.employee_id).first()
         if not employee:
             raise ValueError("员工不存在")
         
         # 检查项目ID是否存在
-        from app.models.project import Project
+        from src.app.models.project import Project
         project = self.db.query(Project).filter(Project.id == worklog_data.project_id).first()
         if not project:
             raise ValueError("项目不存在")

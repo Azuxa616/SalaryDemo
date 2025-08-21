@@ -11,13 +11,13 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_
 
-from app.models.salary_engine import (
+from src.app.models.salary_engine import (
     SalaryRule, SalaryCalculationBatch, SalaryCalculationResult,
     EmployeeSalaryConfig, DeductionConfig
 )
-from app.models.worklog import WorkLog
-from app.models.user import User
-from app.services.rule_interpreter import RuleInterpreter
+from src.app.models.worklog import WorkLog
+from src.app.models.user import User
+from src.app.services.rule_interpreter import RuleInterpreter
 
 logger = logging.getLogger(__name__)
 
@@ -79,51 +79,40 @@ class SalaryCalculationService:
             batch.started_at = datetime.now(timezone.utc)
             self.db.commit()
             
-            # 获取需要计算的员工列表
+            # 复用“立即计算”的逐条工作记录处理逻辑，确保规则上下文包含 worklog.hours 等字段
             period_start = batch.period_start
             period_end = batch.period_end
-            employees = self._get_employees_for_calculation(period_start, period_end)
-            batch.total_employees = len(employees)
-            self.db.commit()
-            
-            success_count = 0
-            error_count = 0
-            total_amount = Decimal('0')
-            
-            # 逐个计算员工薪资
-            for employee in employees:
-                try:
-                    employee_id = int(str(employee.id)) if hasattr(employee, 'id') and employee.id is not None else 0
-                    result = self._calculate_employee_salary(
-                        employee_id, 
-                        period_start, 
-                        period_end,
-                        batch_id
-                    )
-                    
-                    if result:
-                        success_count += 1
-                        total_amount += result.net_amount
-                    else:
-                        error_count += 1
-                        
-                except Exception as e:
-                    error_count += 1
-                    logger.error(f"员工 {employee.id} 薪资计算失败: {str(e)}")
-                
-                batch.processed_count += 1
-                self.db.commit()
-            
+            process_result = self.process_pending_worklogs(period_start=period_start, period_end=period_end, batch_id=batch_id)
+
+            # 根据处理结果回填批次统计
+            batch.processed_count = int(process_result.get("processed_count", 0))
+            batch.success_count = int(process_result.get("success_count", 0))
+            batch.error_count = int(process_result.get("error_count", 0))
+            try:
+                batch.total_amount = Decimal(str(process_result.get("total_amount", 0)))
+            except Exception:
+                batch.total_amount = Decimal('0')
+
+            # 统计涉及员工数（可选，避免额外查询时，可从已处理记录推断）
+            try:
+                employees_involved = {int(item.get("employee_id")) for item in process_result.get("processed_worklogs", []) if item.get("employee_id") is not None}
+                batch.total_employees = len(employees_involved)
+            except Exception:
+                pass
+
             # 更新批次状态
-            batch.status = 'COMPLETED'
-            batch.success_count = success_count
-            batch.error_count = error_count
-            batch.total_amount = total_amount
+            if process_result.get("success"):
+                batch.status = 'COMPLETED'
+            else:
+                batch.status = 'FAILED'
+                batch.error_log = process_result.get("message", "")
             batch.completed_at = datetime.now(timezone.utc)
             self.db.commit()
             
-            logger.info(f"计算批次执行完成: {batch_id}, 成功: {success_count}, 失败: {error_count}")
-            return True
+            logger.info(
+                f"计算批次执行完成: {batch_id}, 成功: {batch.success_count}, 失败: {batch.error_count}"
+            )
+            return bool(process_result.get("success"))
             
         except Exception as e:
             if batch:

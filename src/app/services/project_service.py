@@ -3,8 +3,8 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
-from app.models.project import Project, ProjectCreate, ProjectUpdate
-from app.models.user import User
+from src.app.models.project import Project, ProjectCreate, ProjectUpdate
+from src.app.models.user import User
 
 
 class ProjectService:
@@ -85,7 +85,7 @@ class ProjectService:
             return False
         
         # 检查是否有工作记录关联到此项目
-        from app.models.worklog import WorkLog
+        from src.app.models.worklog import WorkLog
         worklog_count = self.db.query(WorkLog).filter(WorkLog.project_id == project_id).count()
         
         if worklog_count > 0:

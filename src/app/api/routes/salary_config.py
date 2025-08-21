@@ -12,10 +12,10 @@ from pydantic import BaseModel, Field
 import logging
 from uuid import UUID
 
-from app.api.deps import get_db, get_current_user, require_role
-from app.core.roles import ROLE_ADMIN, ROLE_SUPERADMIN
-from app.models.user import User
-from app.models.salary_engine import (
+from src.app.api.deps import get_db, get_current_user, require_role
+from src.app.core.roles import ROLE_ADMIN, ROLE_SUPERADMIN
+from src.app.models.user import User
+from src.app.models.salary_engine import (
     EmployeeSalaryConfig, 
     EmployeeSalaryConfigCreate, 
     EmployeeSalaryConfigUpdate, 
@@ -23,7 +23,7 @@ from app.models.salary_engine import (
     EmployeeSalaryConfigList,
     SalaryCalculationBatch
 )
-from app.services.salary_calculation_service import SalaryCalculationService
+from src.app.services.salary_calculation_service import SalaryCalculationService
 
 router = APIRouter(prefix="/salary-config", tags=["salary-config"])
 

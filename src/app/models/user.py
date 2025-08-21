@@ -7,7 +7,7 @@ from sqlalchemy import Boolean, DateTime, Integer, String, SmallInteger, func
 from sqlalchemy.orm import validates, relationship, Mapped, mapped_column
 from pydantic import BaseModel, Field
 
-from app.db.base import Base
+from src.app.db.base import Base
 
 
 class User(Base):

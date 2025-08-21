@@ -6,21 +6,40 @@
 """
 
 from typing import List, Optional
+from enum import Enum
 from uuid import UUID
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from pydantic import BaseModel, Field
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
+from zoneinfo import ZoneInfo
 
-from app.api.deps import get_db, require_role, get_current_user
-from app.core.roles import ROLE_ADMIN, ROLE_SUPERADMIN
-from app.models.user import User
-from app.models.salary_engine import SalaryCalculationBatch, SalaryCalculationResult
-from app.core.roles import ROLE_ADMIN
-from app.api.deps import get_current_user
-from app.services.salary_calculation_service import SalaryCalculationService
+from src.app.api.deps import get_db, require_role, get_current_user
+from src.app.core.roles import ROLE_ADMIN, ROLE_SUPERADMIN
+from src.app.models.user import User
+from src.app.models.salary_engine import SalaryCalculationBatch, SalaryCalculationResult
+from src.app.core.roles import ROLE_ADMIN
+from src.app.api.deps import get_current_user
+from src.app.services.salary_calculation_service import SalaryCalculationService
 
 router = APIRouter(prefix="/salary-calculation", tags=["salary-calculation"])
+
+
+def _to_utc(dt: datetime) -> datetime:
+	"""将任何传入时间统一转换为 UTC。
+	- 若 dt 为 naive（无 tzinfo），按 Asia/Shanghai 解释再转 UTC
+	- 若 dt 为 tz-aware，直接转 UTC
+	"""
+	if dt.tzinfo is None or dt.tzinfo.utcoffset(dt) is None:
+		local_tz = ZoneInfo("Asia/Shanghai")
+		dt = dt.replace(tzinfo=local_tz)
+	return dt.astimezone(timezone.utc)
+
+
+class CalculationPeriod(str, Enum):
+	MONTHLY = "MONTHLY"
+	WEEKLY = "WEEKLY"
+	CUSTOM = "CUSTOM"
 
 
 class SalaryCalculationRequest(BaseModel):
@@ -30,7 +49,7 @@ class SalaryCalculationRequest(BaseModel):
 	batch_name: Optional[str] = Field(None, description="批次名称，定时计算时必填")
 	period_start: Optional[date] = Field(None, description="计算开始日期，为空则计算所有待核算记录")
 	period_end: Optional[date] = Field(None, description="计算结束日期，为空则计算所有待核算记录")
-	calculation_period: str = Field("CUSTOM", description="计算周期：MONTHLY/月度、WEEKLY/周度、CUSTOM/自定义")
+	calculation_period: CalculationPeriod = Field(CalculationPeriod.CUSTOM, description="计算周期：MONTHLY/月度、WEEKLY/周度、CUSTOM/自定义")
 	description: Optional[str] = Field(None, description="计算描述")
 
 
@@ -97,7 +116,7 @@ async def calculate_salary(
 		period_end = request.period_end or date.today()
 		batch = service.create_calculation_batch(
 			batch_name=f"IMMEDIATE-{datetime.now().strftime('%Y%m%d-%H%M%S')}",
-			calculation_period=request.calculation_period or "CUSTOM",
+			calculation_period=(request.calculation_period.value if hasattr(request.calculation_period, "value") else str(request.calculation_period or "CUSTOM")),
 			period_start=period_start,
 			period_end=period_end,
 			created_by=current_user.id,
@@ -145,16 +164,21 @@ async def calculate_salary(
 		if not request.period_end:
 			request.period_end = date.today()
 
+		# 统一标准化为 UTC 时间
+		try:
+			utc_time = _to_utc(request.scheduled_time)
+		except Exception:
+			raise HTTPException(status_code=400, detail="scheduled_time 无法解析，请提供带时区的 ISO 时间或有效格式")
+
 		batch = service.create_calculation_batch(
 			batch_name=request.batch_name,
-			calculation_period=request.calculation_period,
+			calculation_period=(request.calculation_period.value if hasattr(request.calculation_period, "value") else str(request.calculation_period)),
 			period_start=request.period_start,
 			period_end=request.period_end,
 			created_by=current_user.id,
 		)
-		# 额外信息
-		setattr(batch, "status", "SCHEDULED")
-		setattr(batch, "scheduled_time", request.scheduled_time)
+		# 额外信息：不再使用 SCHEDULED 状态，沿用 PENDING + scheduled_time(UTC)
+		setattr(batch, "scheduled_time", utc_time)
 		setattr(batch, "description", request.description)
 		db.commit()
 
@@ -162,7 +186,7 @@ async def calculate_salary(
 			success=True,
 			message=f"定时计算批次创建成功，ID: {batch.id}",
 			batch_id=str(batch.id),
-			scheduled_time=request.scheduled_time,
+			scheduled_time=utc_time,
 		)
 
 	raise HTTPException(status_code=400, detail="无效的计算类型，必须是 IMMEDIATE 或 SCHEDULED")
@@ -216,7 +240,7 @@ async def execute_scheduled_batch(
 	batch = service.get_calculation_batch(UUID(batch_id))
 	if not batch:
 		raise HTTPException(status_code=404, detail="计算批次不存在")
-	if batch.status != "SCHEDULED":
+	if batch.status not in ["PENDING", "PROCESSING"]:
 		raise HTTPException(status_code=400, detail=f"批次状态不正确: {batch.status}")
 
 	success = service.execute_calculation_batch(UUID(batch_id))
@@ -292,6 +316,10 @@ async def list_calculation_results(
 			"updated_at": it.updated_at,
 		})
 	return result
+
+
+# ========== 定时任务管理接口 ==========
+# 已移至 src/app/api/routes/task_management.py
 
 
 def _can_access_employee(current_user: User, target_employee_id: int, db: Session) -> bool:

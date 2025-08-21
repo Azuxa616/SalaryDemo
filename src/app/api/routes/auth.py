@@ -5,10 +5,10 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db, require_role
-from app.core.security import create_access_token, get_password_hash, verify_password
-from app.models.user import TokenOut, User, UserCreate, UserLogin, UserOut
-from app.models.salary_engine import EmployeeSalaryConfig
+from src.app.api.deps import get_db, require_role
+from src.app.core.security import create_access_token, get_password_hash, verify_password
+from src.app.models.user import TokenOut, User, UserCreate, UserLogin, UserOut
+from src.app.models.salary_engine import EmployeeSalaryConfig
 
 
 router = APIRouter(prefix="/auth", tags=["auth"])
