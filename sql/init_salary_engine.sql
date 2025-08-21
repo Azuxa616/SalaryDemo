@@ -171,9 +171,7 @@ CREATE TRIGGER update_deduction_configs_updated_at BEFORE UPDATE ON public.deduc
 -- 4.1 插入示例薪资规则
 INSERT INTO public.salary_rules (name, description, rule_type, formula, variables, priority) VALUES
 ('基本工资', '员工基本工资', 'FIXED', 'base_salary', '{"base_salary": "employee.base_salary"}', 1),
-('加班费', '加班工时计算', 'RATE', 'overtime_hours * hourly_rate * overtime_multiplier', '{"overtime_hours": "worklog.overtime_hours", "hourly_rate": "employee.hourly_rate", "overtime_multiplier": "employee.overtime_rate"}', 2),
-('交通补助', '每月交通补助', 'FIXED', '500', '{}', 3),
-('深夜津贴', '22:00后工作津贴', 'CONDITIONAL', 'IF(work_time > 22:00) THEN hours * 30', '{"work_time": "worklog.end_time", "hours": "worklog.hours"}', 4)
+('工时费', '工时计算', 'RATE', 'hourly_rate * hours', '{"hours": "worklog.hours", "hourly_rate": "employee.hourly_rate"}', 2)
 ON CONFLICT (name) DO NOTHING;
 
 -- 4.2 插入示例扣除项配置
